@@ -81,11 +81,22 @@ class HassWS:
     async def fetch_states(self) -> Message[list[HassEntity]]:
         return await self.send_message("get_states")
 
-    async def fetch_config(self) -> Message[dict]:
+    async def fetch_config(self) -> Message[HassConfig]:
         return await self.send_message("get_config")
 
-    async def fetch_services(self) -> Message[dict]:
+    async def fetch_services(self) -> Message[dict[str, dict[str, HassService]]]:
         return await self.send_message("get_services")
 
-    async def fetch_panels(self) -> Message[dict]:
+    async def fetch_panels(self) -> Message[dict[str, HassPanel]]:
         return await self.send_message("get_panels")
+
+    async def call_service(
+        self, domain: str, service: str, target: HassServiceTarget = {}, data: dict = {}
+    ):
+        return await self.send_message(
+            "call_service",
+            domain=domain,
+            service=service,
+            service_data=data,
+            target=target,
+        )
