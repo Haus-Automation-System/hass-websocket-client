@@ -78,6 +78,11 @@ class HassWS:
         self.message_id += 1
         return Message.create(json.loads(await self.connection.recv()))
 
-    async def states(self) -> Message[list[HassEntity]]:
-        self.guard_ready()
+    async def fetch_states(self) -> Message[list[HassEntity]]:
         return await self.send_message("get_states")
+
+    async def fetch_config(self) -> Message[dict]:
+        return await self.send_message("get_config")
+
+    async def fetch_services(self) -> Message[dict]:
+        return await self.send_message("get_services")
