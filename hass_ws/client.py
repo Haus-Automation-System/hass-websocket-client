@@ -1,8 +1,43 @@
+from asyncio import Event, create_task, sleep
 from typing import Union
 from websockets import client
 import json
 from .exceptions import *
 from .models import *
+from contextlib import asynccontextmanager, AbstractAsyncContextManager
+
+
+class HassEventListener:
+    def __init__(self, quit_event: Event, client: "HassWS", subscription_id: int):
+        self.quit_event = quit_event
+        self.client = client
+        self.subscription_id = subscription_id
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> Message:
+        if self.quit_event.is_set():
+            raise StopAsyncIteration
+        self.client.guard_ready()
+        while True:
+            task = create_task(self.client.connection.recv())
+            while True:
+                await sleep(0)
+                if task.cancelled():
+                    raise StopAsyncIteration
+                if task.done():
+                    data = Message.create(json.loads(task.result()))
+                    if data.id == self.subscription_id:
+                        return data
+                    else:
+                        break
+                if self.quit_event.is_set():
+                    task.cancel()
+                    raise StopAsyncIteration
+
+    def quit(self):
+        self.quit_event.set()
 
 
 class HassWS:
@@ -92,11 +127,35 @@ class HassWS:
 
     async def call_service(
         self, domain: str, service: str, target: HassServiceTarget = {}, data: dict = {}
-    ):
-        return await self.send_message(
-            "call_service",
-            domain=domain,
-            service=service,
-            service_data=data,
-            target=target,
-        )
+    ) -> bool:
+        return (
+            await self.send_message(
+                "call_service",
+                domain=domain,
+                service=service,
+                service_data=data,
+                target=target,
+            )
+        ).success
+
+    @asynccontextmanager
+    async def listen_event(
+        self, type: str = None
+    ) -> AbstractAsyncContextManager[HassEventListener]:
+        if type:
+            subscription_response = await self.send_message(
+                "subscribe_events", event_type=type
+            )
+        else:
+            subscription_response = await self.send_message("subscribe_events")
+        if not subscription_response.success:
+            raise HassException(detail="Failed to subscribe to event")
+        quit_event = Event()
+        listener = HassEventListener(quit_event, self, subscription_response.id)
+        try:
+            yield listener
+        finally:
+            listener.quit()
+            await self.send_message(
+                "unsubscribe_events", subscription=subscription_response.id
+            )
