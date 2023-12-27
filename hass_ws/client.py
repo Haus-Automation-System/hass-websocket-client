@@ -86,3 +86,6 @@ class HassWS:
 
     async def fetch_services(self) -> Message[dict]:
         return await self.send_message("get_services")
+
+    async def fetch_panels(self) -> Message[dict]:
+        return await self.send_message("get_panels")

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "hass-client"
+name = "hass-ws"
 version = "0.1.0"
 description = "HomeAssistant WS wrapper library"
 authors = ["iTecAI <matteovh@gmail.com>"]

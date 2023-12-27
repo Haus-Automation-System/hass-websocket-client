@@ -1,4 +1,4 @@
-from hass_client import HassWS
+from hass_ws import HassWS
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -28,6 +28,13 @@ async def test_get_services(client: HassWS):
             print(json.dumps(result.data, indent=4), file=f)
 
 
+async def test_get_panels(client: HassWS):
+    with open("panels.out.json", "w") as f:
+        result = await client.fetch_panels()
+        if result.success:
+            print(json.dumps(result.data, indent=4), file=f)
+
+
 async def test_ops():
     client = await HassWS(os.environ["HASS_SERVER"], os.environ["HASS_TOKEN"])
     print(client.meta)
@@ -35,6 +42,7 @@ async def test_ops():
     await test_get_states(client)
     await test_get_config(client)
     await test_get_services(client)
+    await test_get_panels(client)
 
     await client.close()
 
