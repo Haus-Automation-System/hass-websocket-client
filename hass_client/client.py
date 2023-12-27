@@ -10,7 +10,7 @@ class HassWS:
         self.server = server
         self.token = token
         self.connection: client.WebSocketClientProtocol = None
-        self.message_id: int = 0
+        self.message_id: int = 1
         self.meta: Union[HassMeta, None] = None
 
     def __await__(self):
@@ -50,6 +50,7 @@ class HassWS:
         if auth_reply.get("type") == "auth_ok":
             self.connection = connection
             self.meta = HassMeta(version=auth_reply["ha_version"], server=self.server)
+            self.message_id = 1
         else:
             raise AuthenticationError(
                 detail="Failed to authenticate with provided token."
@@ -64,3 +65,19 @@ class HassWS:
     @property
     def ready(self) -> bool:
         return self.connection and self.connection.open
+
+    def guard_ready(self):
+        if not self.ready:
+            raise HassException(detail="Connection is closed.")
+
+    async def send_message(self, type: str, **kwargs) -> Message:
+        self.guard_ready()
+        await self.connection.send(
+            json.dumps(dict(id=self.message_id, type=type, **kwargs))
+        )
+        self.message_id += 1
+        return Message.create(json.loads(await self.connection.recv()))
+
+    async def states(self) -> Message[list[HassEntity]]:
+        self.guard_ready()
+        return await self.send_message("get_states")
