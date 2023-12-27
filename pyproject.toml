@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "hass-client"
+version = "0.1.0"
+description = "HomeAssistant WS wrapper library"
+authors = ["iTecAI <matteovh@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+websockets = "^12.0"
+pydantic = "^2.5.3"
+
+[tool.poetry.group.dev.dependencies]
+python-dotenv = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
