@@ -1,4 +1,4 @@
-from hass_ws import HassWS
+from hass_websocket_client import HassWS
 from dotenv import load_dotenv
 import os
 import asyncio
