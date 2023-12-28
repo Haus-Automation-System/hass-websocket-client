@@ -16,7 +16,7 @@ class HassEventListener:
     def __aiter__(self):
         return self
 
-    async def __anext__(self) -> Message:
+    async def __anext__(self) -> Message[HassEvent]:
         if self.quit_event.is_set():
             raise StopAsyncIteration
         self.client.guard_ready()
@@ -29,7 +29,7 @@ class HassEventListener:
                 if task.done():
                     data = Message.create(json.loads(task.result()))
                     if data.id == self.subscription_id:
-                        return data
+                        return data.data
                     else:
                         break
                 if self.quit_event.is_set():

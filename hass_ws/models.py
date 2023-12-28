@@ -108,6 +108,11 @@ class HassPanel(TypedDict):
     config_panel_domain: Union[str, None]
 
 
+class HassEvent(TypedDict):
+    event_type: str
+    data: dict[str, Any]
+
+
 class Message[MessageType](BaseModel):
     id: int
     type: str
