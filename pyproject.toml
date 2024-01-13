@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hass-websocket-client"
-version = "0.1.0"
+version = "0.1.1"
 description = "HomeAssistant WS wrapper library"
 authors = ["iTecAI <matteovh@gmail.com>"]
 license = "MIT"

@@ -49,14 +49,19 @@ class HassEntity(TypedDict):
 
 class HassServiceField(TypedDict):
     name: Optional[str]
-    description: str
+    description: Optional[str]
     example: Any
+    default: Optional[Any]
+    required: Optional[bool]
+    advanced: Optional[bool]
+    selector: dict[str, Any]
 
 
 class HassService(TypedDict):
     name: Optional[str]
     description: str
     fields: dict[str, HassServiceField]
+    target: Optional[dict]
 
 
 class HassServiceTarget(TypedDict):
