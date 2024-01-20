@@ -1,10 +1,11 @@
-from asyncio import Event, create_task, sleep
+from asyncio import CancelledError, Event, create_task, sleep
 from typing import Union
 from websockets import client
 import json
 from .exceptions import *
 from .models import *
 from contextlib import asynccontextmanager, AbstractAsyncContextManager
+from secrets import token_urlsafe
 
 
 class HassEventListener:
@@ -47,6 +48,7 @@ class HassWS:
         self.connection: client.WebSocketClientProtocol = None
         self.message_id: int = 1
         self.meta: Union[HassMeta, None] = None
+        self.workers: dict[str, HassWS] = {}
 
     def __await__(self):
         return self._initialize().__await__()
@@ -95,6 +97,10 @@ class HassWS:
         if self.connection:
             await self.connection.close()
 
+        for w in list(self.workers.keys()):
+            await self.workers[w].close()
+            del self.workers[w]
+
         self.meta = None
 
     @property
@@ -105,7 +111,9 @@ class HassWS:
         if not self.ready:
             raise HassException(detail="Connection is closed.")
 
-    async def send_message(self, type: str, **kwargs) -> Message:
+    async def send_message(self, type: str, ignore_closed: bool = False, **kwargs) -> Message:
+        if ignore_closed and not self.ready:
+            return
         self.guard_ready()
         await self.connection.send(
             json.dumps(dict(id=self.message_id, type=type, **kwargs))
@@ -138,24 +146,46 @@ class HassWS:
             )
         ).success
 
+    async def start_worker_listener(self, type: str = None) -> tuple["HassWS", HassEventListener]:
+        worker = await HassWS(self.server, self.token)
+        if type:
+            subscription_response = await worker.send_message(
+                "subscribe_events", event_type=type
+            )
+        else:
+            subscription_response = await worker.send_message("subscribe_events")
+        if not subscription_response.success:
+            raise HassException(detail="Failed to subscribe to event")
+        quit_event = Event()
+        listener = HassEventListener(
+            quit_event, worker, subscription_response.id)
+        return worker, listener
+
     @asynccontextmanager
     async def listen_event(
         self, type: str = None
     ) -> AbstractAsyncContextManager[HassEventListener]:
-        if type:
-            subscription_response = await self.send_message(
-                "subscribe_events", event_type=type
-            )
-        else:
-            subscription_response = await self.send_message("subscribe_events")
-        if not subscription_response.success:
-            raise HassException(detail="Failed to subscribe to event")
-        quit_event = Event()
-        listener = HassEventListener(quit_event, self, subscription_response.id)
+        worker, listener = await self.start_worker_listener(type=type)
+        worker_id = token_urlsafe()
+        self.workers[worker_id] = worker
         try:
-            yield listener
-        finally:
-            listener.quit()
-            await self.send_message(
-                "unsubscribe_events", subscription=subscription_response.id
-            )
+            try:
+                yield listener
+            finally:
+                listener.quit()
+                await worker.send_message(
+                    "unsubscribe_events", subscription=listener.subscription_id, ignore_closed=True
+                )
+                await self.workers[worker_id].close()
+                del self.workers[worker_id]
+        except (CancelledError, RuntimeError):
+            try:
+                listener.quit()
+                await worker.send_message(
+                    "unsubscribe_events", subscription=listener.subscription_id, ignore_closed=True
+                )
+                await self.workers[worker_id].close()
+                del self.workers[worker_id]
+            except:
+                pass
+            raise CancelledError
